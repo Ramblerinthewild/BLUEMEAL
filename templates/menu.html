@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center">
+      <h4 class="text-primary mb-0">{{ meal }} <small class="text-muted">({{ status }})</small></h4>
+      <small class="text-muted">{{ date }} • {{ time_range }}</small>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-md-6">
+        <h6 class="text-secondary">Available items</h6>
+        <ul class="list-group mb-3" id="items-list">
+          {% for it in items %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ it }}</span>
+            <input type="checkbox" class="form-check-input select-item" value="{{ it }}">
+          </li>
+          {% else %}
+          <li class="list-group-item">No items listed for this meal.</li>
+          {% endfor %}
+        </ul>
+
+        <div class="mb-3">
+          <label class="form-label">Portion</label>
+          <select id="portion" class="form-select">
+            <option value="small">Small</option>
+            <option selected value="regular">Regular</option>
+            <option value="large">Large</option>
+          </select>
+        </div>
+
+        <button id="checkBtn" class="btn btn-primary w-100">Check balance & save</button>
+      </div>
+
+      <div class="col-md-6">
+        <h6 class="text-secondary">Suggestions</h6>
+        <div id="suggestions" class="p-3 bg-white rounded shadow-sm min-vh-25">
+          <p class="text-muted">Pick items and click "Check balance & save" to get suggestions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const meal = "{{ meal|e }}";
+const date = "{{ date|e }}";
+document.getElementById('checkBtn').addEventListener('click', async () => {
+  const checked = Array.from(document.querySelectorAll('.select-item:checked')).map(n => n.value);
+  const portion = document.getElementById('portion').value;
+  if (!checked.length) {
+    alert("Pick at least one item!");
+    return;
+  }
+  const resp = await fetch("/suggest", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({items: checked, portion, meal, date})
+  });
+  const data = await resp.json();
+  const el = document.getElementById('suggestions');
+  el.innerHTML = "";
+  if (data.suggestions && data.suggestions.length) {
+    data.suggestions.forEach(s => {
+      const opt = document.createElement('div');
+      opt.innerHTML = `<strong>Missing:</strong> ${s.need} <br><small class="text-muted">Try: ${s.options.join(', ') || '—'}</small>`;
+      opt.className = 'mb-2';
+      el.appendChild(opt);
+    });
+  } else {
+    el.innerHTML = '<div class="alert alert-success">Your selection looks balanced ✅</div>';
+  }
+  const present = data.present || [];
+  const p = document.createElement('div');
+  p.className='mt-3 small text-muted';
+  p.innerText = 'Present nutrients: ' + present.join(', ');
+  el.appendChild(p);
+  // optionally show a friendly animation or icon here
+});
+</script>
+{% endblock %}

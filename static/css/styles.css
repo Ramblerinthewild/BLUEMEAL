@@ -1,0 +1,15 @@
+:root{
+    --blue-1: #0d6efd; /* bootstrap primary */
+    --blue-2: #eaf4ff;
+  }
+  body.bg-light-blue{
+    background: linear-gradient(180deg, #f8fbff, #ffffff);
+    min-height: 100vh;
+  }
+  /* card accents */
+  .card { border-radius: 14px; }
+  .navbar-brand { color: var(--blue-1) !important; font-size: 1.25rem; }
+  .list-group-item { border: 0; border-radius: 8px; margin-bottom: 8px; background: white;}
+  select.form-select, .form-control { border-radius: 8px; }
+  .btn-primary { background: var(--blue-1); border: none; }
+  

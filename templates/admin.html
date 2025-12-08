@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between">
+      <h4 class="text-primary">Admin Dashboard</h4>
+      <div>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('export_selections') }}">Export CSV</a>
+      </div>
+    </div>
+    <hr>
+    <p class="text-muted">Total selections: <strong>{{ total }}</strong></p>
+
+    <h6 class="text-secondary mt-3">Top chosen items</h6>
+    <ul class="list-group">
+      {% for item,count in top_list %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>{{ item }}</span><span class="badge bg-primary rounded-pill">{{ count }}</span>
+      </li>
+      {% else %}
+      <li class="list-group-item">No data yet.</li>
+      {% endfor %}
+    </ul>
+
+    <p class="mt-4 small text-muted">Tip: expand analytics later with Chart.js or Plotly (client-side).</p>
+  </div>
+</div>
+{% endblock %}

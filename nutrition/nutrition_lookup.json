@@ -1,0 +1,13 @@
+{
+    "Pancakes": {"Carbs": 30, "Protein": 6, "Vitamins": 2, "Minerals": 1, "Salt": 0.5, "Water": 10},
+    "Chicken Rice": {"Carbs": 50, "Protein": 20, "Vitamins": 3, "Minerals": 2, "Salt": 1, "Water": 20},
+    "Fruit": {"Carbs": 15, "Protein": 1, "Vitamins": 5, "Minerals": 1, "Salt": 0, "Water": 50},
+    "Beef Stew": {"Carbs": 20, "Protein": 25, "Vitamins": 2, "Minerals": 3, "Salt": 1, "Water": 30},
+    "Chocolate": {"Carbs": 25, "Protein": 2, "Vitamins": 0, "Minerals": 0, "Salt": 0.2, "Water": 5},
+    "Oatmeal": {"Carbs": 40, "Protein": 5, "Vitamins": 2, "Minerals": 1, "Salt": 0, "Water": 15},
+    "Pasta Salad": {"Carbs": 45, "Protein": 10, "Vitamins": 3, "Minerals": 1, "Salt": 0.5, "Water": 10},
+    "Yogurt": {"Carbs": 12, "Protein": 4, "Vitamins": 2, "Minerals": 1, "Salt": 0.2, "Water": 20},
+    "Grilled Fish": {"Carbs": 0, "Protein": 30, "Vitamins": 2, "Minerals": 2, "Salt": 0.8, "Water": 15},
+    "Nuts": {"Carbs": 10, "Protein": 5, "Vitamins": 1, "Minerals": 1, "Salt": 0, "Water": 5}
+  }
+  

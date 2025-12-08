@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title text-primary">Sign up</h3>
+        <p class="text-muted small">Use your school email (e.g. you@school.edu)</p>
+        <form method="post">
+          <div class="mb-3">
+            <label>Email</label>
+            <input required name="email" type="email" class="form-control" placeholder="you@school.edu">
+          </div>
+          <div class="mb-3">
+            <label>Password</label>
+            <input required name="password" type="password" class="form-control">
+          </div>
+          <button class="btn btn-primary w-100">Sign up</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
