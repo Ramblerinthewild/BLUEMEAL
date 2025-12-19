@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="text-center mb-4">Weekly Calendar</h2>
+
+  <!-- Day Selector -->
+  <div class="d-flex justify-content-center align-items-center mb-3">
+    <button class="btn btn-outline-secondary btn-sm me-2" id="prevDay">&lt;</button>
+    <h4 id="dayName" class="text-center flex-grow-1"></h4>
+    <button class="btn btn-outline-secondary btn-sm ms-2" id="nextDay">&gt;</button>
+  </div>
+
+  <hr class="my-4" style="border-top: 1px solid #ccc;">
+
+  <div class="d-flex justify-content-center mb-4">
+    <button class="btn btn-outline-primary me-2">Breakfast</button>
+    <button class="btn btn-outline-primary me-2">Morning Snack</button>
+    <button class="btn btn-outline-primary me-2">Lunch</button>
+    <button class="btn btn-outline-primary me-2">Afternoon Snack</button>
+    <button class="btn btn-outline-primary me-2">Dinner</button>
+    <button class="btn btn-outline-primary">Night Snack</button>
+  </div>
+
+  <div class="menu-items-container" style="overflow-x:auto; display:flex; gap:10px; padding-bottom:10px;">
+    <!-- Cards will be inserted here dynamically via JS -->
+  </div>
+
+  <button id="submit-selection" class="btn btn-success mt-3">Submit Selection</button>
+
+  <ul id="selected-list"></ul>
+ 
+
+</div>
+
+<script>
+  // Array of 7 days for the demo
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  let currentIndex = 0;
+
+  const selectedItems = []; // store selected menu items
+
+
+  const dayNameElem = document.getElementById("dayName");
+
+  function updateDay() {
+    dayNameElem.textContent = days[currentIndex];
+  }
+
+  // Initial day
+  updateDay();
+
+  // Prev/Next buttons
+  document.getElementById("prevDay").addEventListener("click", () => {
+    currentIndex = (currentIndex - 1 + days.length) % days.length;
+    updateDay();
+  });
+
+  document.getElementById("nextDay").addEventListener("click", () => {
+    currentIndex = (currentIndex + 1) % days.length;
+    updateDay();
+  });
+
+    // Example items for each meal
+    const mealItems = {
+    "Breakfast": ["Bread", "Eggs", "Juice", "Fruit", "Yogurt", "Tea"],
+    "Morning Snack": ["Banana", "Granola Bar", "Water", "Apple", "Popcorn", "Milk"],
+    "Lunch": ["Rice & Chicken", "Salad", "Beans", "Juice", "Apple", "Bread"],
+    "Afternoon Snack": ["Fruit Cup", "Peanuts", "Milk", "Crackers", "Yogurt", "Tea"],
+    "Dinner": ["Sadza", "Beef Stew", "Vegetables", "Orange", "Water", "Rice"],
+    "Night Snack": ["Biscuits", "Milk", "Peanuts", "Fruit Cup", "Juice", "Chocolate"]
+  };
+
+  const menuContainer = document.querySelector('.menu-items-container');
+  let currentMeal = "Breakfast";  // default meal
+
+  // Function to update cards
+  function updateMenuCards() {
+    menuContainer.innerHTML = ''; // clear previous cards
+    mealItems[currentMeal].forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.minWidth = '120px';
+      card.style.flex = '0 0 auto';
+      card.style.cursor = 'pointer';
+      card.innerHTML = `<div class="card-body text-center">${item}</div>`;
+
+      // Check if this item is already selected
+      if (selectedItems.includes(item)) {
+        card.classList.add('bg-primary', 'text-white'); // highlight selected
+      }
+
+      // Click event to toggle selection
+      card.addEventListener('click', () => {
+        if (selectedItems.includes(item)) {
+          // Deselect
+          selectedItems.splice(selectedItems.indexOf(item), 1);
+          card.classList.remove('bg-primary', 'text-white');
+        } else {
+          // Select
+          selectedItems.push(item);
+          card.classList.add('bg-primary', 'text-white');
+        }
+        console.log(selectedItems); // for debugging
+      });
+
+      menuContainer.appendChild(card);
+    });
+  }
+
+  // Initial display
+  updateMenuCards();
+
+  // Meal buttons click event
+  document.querySelectorAll('.btn-outline-primary').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentMeal = btn.textContent;
+      updateMenuCards();
+    });
+  });
+
+  document.getElementById("submit-selection").addEventListener("click", () => {
+  if (selectedItems.length === 0) {
+    alert("Please select at least one item.");
+    return;
+  }
+
+  fetch("/submit-menu", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      day: days[currentIndex],
+      meal: currentMeal,
+      items: selectedItems.join(", ")
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    window.location.href = "/analytics";
+  });
+});
+</script>
+{% endblock %}

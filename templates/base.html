@@ -17,6 +17,8 @@
           <span class="me-2 small text-muted">{{ current_user.email }}</span>
           <a class="btn btn-outline-primary btn-sm" href="{{ url_for('menu') }}">Menu</a>
           <a class="btn btn-outline-secondary btn-sm ms-2" href="{{ url_for('logout') }}">Logout</a>
+          <a class="btn btn-outline-secondary btn-sm ms-2" href="{{ url_for('calender_day') }}">Calender</a> 
+          <a class="btn btn-outline-secondary btn-sm ms-2" href="{{ url_for('Analytics') }}">Analytics</a> 
         {% else %}
           <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Login</a>
           <a class="btn btn-outline-primary btn-sm ms-2" href="{{ url_for('signup') }}">Sign up</a>

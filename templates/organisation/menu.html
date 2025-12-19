@@ -1,0 +1,276 @@
+{% extends "organisation/base_org.html" %}
+
+{% block content %}
+
+<!-- Calendar header -->
+<div class="calendar-header">
+    <button id="prevMonth">◀</button>
+    <h2 id="monthLabel"></h2>
+    <button id="nextMonth">▶</button>
+</div>
+
+<!-- Calendar grid -->
+<div class="calendar" id="calendar"></div>
+
+<!-- Overlay modal -->
+<div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+        <h3 id="selectedDate">Selected date</h3>
+        <div class="meal-section">
+            <h4>Breakfast</h4>
+            <div class="items" id="breakfastItems"></div>
+            <button onclick="addItem('breakfast')">+ Add item</button>
+        </div>
+        
+        <div class="meal-section">
+            <h4>Lunch</h4>
+            <div class="items" id="lunchItems"></div>
+            <button onclick="addItem('lunch')">+ Add item</button>
+        </div>
+        
+        <div class="meal-section">
+            <h4>Dinner</h4>
+            <div class="items" id="dinnerItems"></div>
+            <button onclick="addItem('dinner')">+ Add item</button>
+        </div>
+        
+    </div>
+</div>
+
+<style>
+.calendar-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.calendar {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+}
+
+.meal-section {
+    margin-bottom: 30px;
+}
+
+.items div {
+    padding: 6px 10px;
+    background: #f2f2f2;
+    margin-bottom: 6px;
+    border-radius: 4px;
+}
+
+.day {
+    padding: 15px;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    text-align: center;
+}
+
+.day:hover {
+    background: #f2f2f2;
+}
+
+/* Overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    width: 60%;
+    max-height: 80%;
+    overflow-y: auto;
+}
+</style>
+
+<script>
+let currentDate = new Date();
+
+const calendar = document.getElementById("calendar");
+const monthLabel = document.getElementById("monthLabel");
+const overlay = document.getElementById("overlay");
+const selectedDateText = document.getElementById("selectedDate");
+
+
+let selectedDate = null;
+
+let menuData = {
+    breakfast: [],
+    lunch: [],
+    dinner: []
+};
+
+
+function renderCalendar() {
+    calendar.innerHTML = "";
+
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    monthLabel.innerText = currentDate.toLocaleString("default", {
+        month: "long",
+        year: "numeric"
+    });
+
+    // Empty slots before first day
+    for (let i = 0; i < firstDay; i++) {
+        calendar.appendChild(document.createElement("div"));
+    }
+
+    // Days
+    for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement("div");
+        cell.className = "day";
+        cell.innerText = day;
+
+        cell.ondblclick = async () => {
+            selectedDate = `${year}-${month + 1}-${day}`;
+            selectedDateText.innerText = selectedDate;
+
+            // fetch existing menu for this date
+            const response = await fetch(`/organisation/get-menu/${selectedDate}`);
+            const data = await response.json();
+
+            menuData = {
+                breakfast: data.breakfast || [],
+                lunch: data.lunch || [],
+                dinner: data.dinner || []
+            };
+
+            // populate UI
+            ["breakfast", "lunch", "dinner"].forEach(meal => {
+                const container = document.getElementById(meal + "Items");
+                container.innerHTML = "";
+                menuData[meal].forEach(item => {
+                    const div = document.createElement("div");
+                    div.innerText = item;
+                    container.appendChild(div);
+                });
+            });
+
+            overlay.style.display = "flex";
+        };
+
+
+
+        calendar.appendChild(cell);
+    }
+}
+
+function toggleSelect(meal, item) {
+  selectedMeals[meal].push(item);
+}
+
+function saveSelection() {
+  fetch("/student/select", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      date: selectedDate,
+      meals: selectedMeals
+    })
+  });
+}
+
+document.getElementById("prevMonth").onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+};
+
+document.getElementById("nextMonth").onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+};
+
+function addItem(meal) {
+    const container = document.getElementById(meal + "Items");
+    
+    // Create a new input field
+    const inputDiv = document.createElement("div");
+    inputDiv.style.display = "flex";
+    inputDiv.style.gap = "10px";
+    inputDiv.style.marginBottom = "6px";
+    
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = `Enter ${meal} item...`;
+    input.style.flex = "1";
+    input.style.padding = "6px 10px";
+    input.style.border = "1px solid #ddd";
+    input.style.borderRadius = "4px";
+    
+    // Save button
+    const saveBtn = document.createElement("button");
+    saveBtn.innerText = "Save";
+    saveBtn.onclick = () => {
+        const value = input.value.trim();
+        if (!value) return;
+        
+        // Add to menuData
+        menuData[meal].push(value);
+        
+        // Replace input with saved item display
+        const itemDiv = document.createElement("div");
+        itemDiv.innerText = value;
+        itemDiv.style.padding = "6px 10px";
+        itemDiv.style.background = "#f2f2f2";
+        itemDiv.style.borderRadius = "4px";
+        
+        container.replaceChild(itemDiv, inputDiv);
+    };
+    
+    // Cancel button
+    const cancelBtn = document.createElement("button");
+    cancelBtn.innerText = "Cancel";
+    cancelBtn.onclick = () => {
+        container.removeChild(inputDiv);
+    };
+    
+    inputDiv.appendChild(input);
+    inputDiv.appendChild(saveBtn);
+    inputDiv.appendChild(cancelBtn);
+    
+    container.appendChild(inputDiv);
+    
+    // Auto-focus the input
+    input.focus();
+}
+
+// Close modal when clicking outside
+overlay.onclick = async (e) => {
+    if (e.target === overlay) {
+        await fetch("/organisation/save-menu", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                date: selectedDate,
+                meals: menuData
+            })
+        });
+
+        overlay.style.display = "none";
+    }
+};
+
+
+
+renderCalendar();
+</script>
+
+{% endblock %}

@@ -4,6 +4,8 @@ from datetime import datetime, time
 import csv
 import json
 from pathlib import Path
+from flask import request, jsonify
+
 
 import pandas as pd
 from flask import (Flask, flash, jsonify, redirect, render_template, request,
@@ -37,11 +39,29 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(200), unique=True, nullable=False)
     pw_hash = db.Column(db.String(200), nullable=False)
+
+    role = db.Column(db.String(50), nullable=False)  
+    # "organisation" | "member" | "individual"
+
     school = db.Column(db.String(200), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def check_password(self, pw):
         return check_password_hash(self.pw_hash, pw)
+class MenuItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)  # breakfast/lunch/dinner
+    item_name = db.Column(db.String(200), nullable=False)
+
+
+class StudentSelection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+
 
 with app.app_context():
     db.create_all()
@@ -181,33 +201,183 @@ def save_selection(user_email, date_str, meal, items, portion):
         writer = csv.writer(f)
         writer.writerow([timestamp, user_email, date_str, meal, "|".join(items), portion])
 
+def redirect_by_role(user):
+    if user.role == "organisation":
+        return redirect(url_for("org_members"))
+    elif user.role == "member":
+        return redirect(url_for("member_dashboard"))   # student flow (existing)
+    elif user.role == "individual":
+        return redirect(url_for("individual_dashboard"))
+    else:
+        return redirect(url_for("index"))
+
+# -----------------------
+# Menu database model
+# -----------------------
+class Menu(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    meal_type = db.Column(db.String(20), nullable=False)  # breakfast/lunch/dinner
+    items = db.Column(db.Text, nullable=True)  # store as JSON string
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+with app.app_context():
+    db.create_all()
+
+
 # -----------------------
 # Routes
 # -----------------------
 @app.route("/")
 def index():
     if current_user.is_authenticated:
-        return redirect(url_for("menu"))
+        return redirect_by_role(current_user)
     return render_template("base.html")
+
 
 @app.route("/signup", methods=["GET","POST"])
 def signup():
     if request.method == "POST":
         email = request.form["email"].strip().lower()
         pw = request.form["password"]
-        if not is_school_email(email):
-            flash("Please use a valid school email address.", "danger")
+        role = request.form["role"]  # NEW
+
+        if role not in ["organisation", "member", "individual"]:
+            flash("Invalid account type.", "danger")
             return redirect(url_for("signup"))
+
         if User.query.filter_by(email=email).first():
-            flash("Email already registered. Please log in.", "warning")
+            flash("Email already registered.", "warning")
             return redirect(url_for("login"))
-        user = User(email=email, pw_hash=generate_password_hash(pw))
+
+        user = User(
+            email=email,
+            pw_hash=generate_password_hash(pw),
+            role=role
+        )
+
         db.session.add(user)
         db.session.commit()
         login_user(user)
-        flash("Signed up successfully!", "success")
-        return redirect(url_for("menu"))
+
+        # redirect based on role
+        if role == "organisation":
+            return redirect(url_for("org_members"))
+        elif role == "member":
+            return redirect(url_for("member_dashboard"))
+        else:
+            return redirect(url_for("individual_dashboard"))
+
     return render_template("signup.html")
+
+@app.route("/organisation/save-menu", methods=["POST"])
+@login_required
+def save_menu():
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.json
+    date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    meals = data["meals"]
+
+    # delete old menu for that date
+    MenuItem.query.filter_by(date=date).delete()
+
+    # add new items
+    for meal_type, items in meals.items():
+        for item in items:
+            db.session.add(MenuItem(date=date, meal_type=meal_type, item_name=item))
+
+    db.session.commit()
+    return jsonify({"status": "saved"})
+
+
+@app.route("/organisation/get-menu/<date_str>")
+@login_required
+def get_menu(date_str):
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    items = MenuItem.query.filter_by(date=date).all()
+
+    result = {"breakfast": [], "lunch": [], "dinner": []}
+    for i in items:
+        result[i.meal_type].append(i.item_name)
+    return jsonify(result)
+
+
+@app.route("/student/menu")
+@login_required
+def get_student_menu():
+    date = request.args.get("date")
+    date = datetime.strptime(date, "%Y-%m-%d").date()
+
+    items = MenuItem.query.filter_by(date=date).all()
+
+    meals = {"breakfast": [], "lunch": [], "dinner": []}
+    for item in items:
+        meals[item.meal_type].append(item.item_name)
+
+    return jsonify(meals)
+
+@app.route("/student/select", methods=["POST"])
+@login_required
+def student_select():
+    if current_user.role != "member":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.json
+    date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+
+    # remove old selection
+    StudentSelection.query.filter_by(
+        student_id=current_user.id,
+        date=date
+    ).delete()
+
+    for meal, items in data["meals"].items():
+        for item in items:
+            db.session.add(StudentSelection(
+                student_id=current_user.id,
+                date=date,
+                meal_type=meal,
+                item_name=item
+            ))
+
+    db.session.commit()
+    return jsonify({"status": "saved"})
+
+@app.route("/organisation/analytics-data")
+@login_required
+def analytics_data():
+    date = request.args.get("date")
+    date = datetime.strptime(date, "%Y-%m-%d").date()
+
+    selections = StudentSelection.query.filter_by(date=date).all()
+
+    result = {"breakfast": [], "lunch": [], "dinner": []}
+    for s in selections:
+        result[s.meal_type].append(s.item_name)
+
+    return jsonify(result)
+
+
+@app.route("/member")
+@login_required
+def member_dashboard():
+    if current_user.role != "member":
+        return redirect(url_for("index"))
+    return render_template("member.html")
+
+
+@app.route("/individual")
+@login_required
+def individual_dashboard():
+    if current_user.role != "individual":
+        return redirect(url_for("index"))
+    return render_template("individual.html")
+
 
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -218,7 +388,11 @@ def login():
         if user and user.check_password(pw):
             login_user(user)
             flash("Logged in!", "success")
-            return redirect(url_for("menu"))
+            if user and user.check_password(pw):
+                login_user(user)
+                flash("Logged in!", "success")
+                return redirect_by_role(user)
+
         flash("Invalid login", "danger")
         return redirect(url_for("login"))
     return render_template("login.html")
@@ -246,6 +420,9 @@ def menu():
                            items=items,
                            time_range=time_range,
                            date=today.isoformat())
+
+
+
 
 @app.route("/suggest", methods=["POST"])
 @login_required
@@ -277,6 +454,71 @@ def admin():
 @login_required
 def export_selections():
     return send_file(SELECTIONS_CSV, as_attachment=True)
+
+@app.route("/calender_day")
+@login_required  # optional: require login
+def calender_day():
+    return render_template("calender_day.html")
+
+@app.route("/Analytics")
+@login_required  # optional: require login
+def Analytics():
+    return render_template("analytics.html")
+
+latest_submission = ""  # TEMP storage (fine for now)
+
+@app.route("/submit-menu", methods=["POST"])
+@login_required
+def submit_menu():
+    global latest_submission
+    data = request.json
+
+    latest_submission = f"""
+    Day: {data['day']}
+    Meal: {data['meal']}
+    Items: {data['items']}
+    """
+
+    return jsonify({"status": "ok"})
+
+@app.route("/organisation/members")
+@login_required
+def org_members():
+    if current_user.role != "organisation":
+        return redirect(url_for("index"))
+    return render_template("organisation/members.html")
+
+
+@app.route("/organisation/analytics")
+@login_required
+def org_analytics():
+    if current_user.role != "organisation":
+        return redirect(url_for("index"))
+    return render_template("organisation/analytics.html")
+
+
+@app.route("/organisation/waste")
+@login_required
+def org_waste():
+    if current_user.role != "organisation":
+        return redirect(url_for("index"))
+    return render_template("organisation/waste.html")
+
+
+@app.route("/organisation/menu")
+@login_required
+def org_menu():
+    if current_user.role != "organisation":
+        return redirect(url_for("index"))
+    return render_template("organisation/menu.html")
+
+
+@app.route("/organisation/demand")
+@login_required
+def org_demand():
+    if current_user.role != "organisation":
+        return redirect(url_for("index"))
+    return render_template("organisation/demand.html")
 
 # -----------------------
 # run
