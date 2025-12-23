@@ -520,6 +520,46 @@ def org_demand():
         return redirect(url_for("index"))
     return render_template("organisation/demand.html")
 
+@app.route("/organisation/demand-data")
+@login_required
+def demand_data():
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    date_str = request.args.get("date")
+    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    selections = StudentSelection.query.filter_by(date=date).all()
+
+    result = {
+        "breakfast": {},
+        "lunch": {},
+        "dinner": {}
+    }
+
+    # group by meal and student to avoid double-counting
+    from collections import defaultdict
+    meal_to_students = defaultdict(lambda: defaultdict(set))  # meal -> item -> set(student_id)
+
+    for s in selections:
+        meal_to_students[s.meal_type][s.item_name].add(s.student_id)
+
+    # calculate percentages
+    for meal, item_dict in meal_to_students.items():
+        # total number of students who voted for this meal
+        all_students = set()
+        for students in item_dict.values():
+            all_students.update(students)
+        total_students = len(all_students)
+        if total_students == 0:
+            continue
+        for item, students in item_dict.items():
+            result[meal][item] = round((len(students) / total_students) * 100, 1)
+
+    return jsonify(result)
+
+
+
 # -----------------------
 # run
 # -----------------------
