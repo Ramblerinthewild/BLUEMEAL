@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 from flask import request, jsonify
-
+from models import db, User, MenuItemTemplate, MenuItem, StudentSelection
 
 import pandas as pd
 from flask import (Flask, flash, jsonify, redirect, render_template, request,
@@ -28,40 +28,19 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET", "dev-secret-key")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DATA_DIR / 'users.db'}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-db = SQLAlchemy(app)
-login_manager = LoginManager(app)
+db.init_app(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
 login_manager.login_view = "login"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 # -----------------------
 # Database models
 # -----------------------
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(200), unique=True, nullable=False)
-    pw_hash = db.Column(db.String(200), nullable=False)
-
-    role = db.Column(db.String(50), nullable=False)  
-    # "organisation" | "member" | "individual"
-
-    school = db.Column(db.String(200), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def check_password(self, pw):
-        return check_password_hash(self.pw_hash, pw)
-class MenuItem(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False)
-    meal_type = db.Column(db.String(20), nullable=False)  # breakfast/lunch/dinner
-    item_name = db.Column(db.String(200), nullable=False)
-
-
-class StudentSelection(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    meal_type = db.Column(db.String(20), nullable=False)
-    item_name = db.Column(db.String(200), nullable=False)
-
 
 with app.app_context():
     db.create_all()
@@ -270,6 +249,63 @@ def signup():
 
     return render_template("signup.html")
 
+# Add menu item template (the master list)
+@app.route("/organisation/add-menu-template", methods=["POST"])
+@login_required
+def add_menu_template():
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    data = request.json
+    
+    # Validate required fields
+    required = ["name", "calories", "protein", "carbs", "fats", "sugar", "fibre", "sodium"]
+    for field in required:
+        if field not in data or data[field] is None:
+            return jsonify({"error": f"{field} is required"}), 400
+    
+    # Check if exists
+    existing = MenuItemTemplate.query.filter_by(name=data["name"]).first()
+    if existing:
+        return jsonify({"error": "Item already exists"}), 400
+    
+    item = MenuItemTemplate(
+        name=data["name"],
+        calories=float(data["calories"]),
+        protein=float(data["protein"]),
+        carbs=float(data["carbs"]),
+        fats=float(data["fats"]),
+        sugar=float(data["sugar"]),
+        fibre=float(data["fibre"]),
+        sodium=float(data["sodium"])
+    )
+    
+    db.session.add(item)
+    db.session.commit()
+    
+    return jsonify({"success": True, "id": item.id})
+
+# Get all menu templates for autocomplete
+@app.route("/organisation/get-menu-templates")
+@login_required
+def get_menu_templates():
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    items = MenuItemTemplate.query.all()
+    return jsonify([{
+        "id": i.id,
+        "name": i.name,
+        "calories": i.calories,
+        "protein": i.protein,
+        "carbs": i.carbs,
+        "fats": i.fats,
+        "sugar": i.sugar,
+        "fibre": i.fibre,
+        "sodium": i.sodium
+    } for i in items])
+
+# Save daily menu (links templates to specific date)
 @app.route("/organisation/save-menu", methods=["POST"])
 @login_required
 def save_menu():
@@ -278,32 +314,43 @@ def save_menu():
 
     data = request.json
     date = datetime.strptime(data["date"], "%Y-%m-%d").date()
-    meals = data["meals"]
+    meals = data["meals"]  # { breakfast: ["Eggs", "Toast"], lunch: [...], dinner: [...] }
 
-    # delete old menu for that date
+    # Delete old menu for that date
     MenuItem.query.filter_by(date=date).delete()
 
-    # add new items
-    for meal_type, items in meals.items():
-        for item in items:
-            db.session.add(MenuItem(date=date, meal_type=meal_type, item_name=item))
+    # Add new items by looking up template IDs
+    for meal_type, item_names in meals.items():
+        for item_name in item_names:
+            template = MenuItemTemplate.query.filter_by(name=item_name).first()
+            if template:
+                db.session.add(MenuItem(
+                    date=date,
+                    meal_type=meal_type,
+                    template_id=template.id
+                ))
 
     db.session.commit()
     return jsonify({"status": "saved"})
 
-
+# Get menu for a specific date
 @app.route("/organisation/get-menu/<date_str>")
 @login_required
 def get_menu(date_str):
     if current_user.role != "organisation":
         return jsonify({"error": "Unauthorized"}), 403
 
-    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
+
     items = MenuItem.query.filter_by(date=date).all()
 
     result = {"breakfast": [], "lunch": [], "dinner": []}
-    for i in items:
-        result[i.meal_type].append(i.item_name)
+    for item in items:
+        result[item.meal_type].append(item.template.name)
+    
     return jsonify(result)
 
 
@@ -317,7 +364,7 @@ def get_student_menu():
 
     meals = {"breakfast": [], "lunch": [], "dinner": []}
     for item in items:
-        meals[item.meal_type].append(item.item_name)
+        meals[item.meal_type].append(item.template.name)
 
     return jsonify(meals)
 
@@ -328,21 +375,31 @@ def student_select():
         return jsonify({"error": "Unauthorized"}), 403
 
     data = request.json
-    date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    try:
+        date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "Invalid date"}), 400
 
-    # remove old selection
+    # Remove old selections for this student and date
     StudentSelection.query.filter_by(
         student_id=current_user.id,
         date=date
     ).delete()
 
+    # Add new selections
     for meal, items in data["meals"].items():
-        for item in items:
+        for item_name in items:
+            # Look up the template by name
+            template = MenuItemTemplate.query.filter_by(name=item_name).first()
+            if not template:
+                print(f"WARNING: Template not found for item '{item_name}'")
+                continue
+            
             db.session.add(StudentSelection(
                 student_id=current_user.id,
                 date=date,
                 meal_type=meal,
-                item_name=item
+                template_id=template.id
             ))
 
     db.session.commit()
@@ -351,6 +408,9 @@ def student_select():
 @app.route("/organisation/analytics-data")
 @login_required
 def analytics_data():
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+        
     date = request.args.get("date")
     date = datetime.strptime(date, "%Y-%m-%d").date()
 
@@ -358,7 +418,8 @@ def analytics_data():
 
     result = {"breakfast": [], "lunch": [], "dinner": []}
     for s in selections:
-        result[s.meal_type].append(s.item_name)
+        # Use template.name instead of item_name
+        result[s.meal_type].append(s.template.name)
 
     return jsonify(result)
 
@@ -527,7 +588,10 @@ def demand_data():
         return jsonify({"error": "Unauthorized"}), 403
 
     date_str = request.args.get("date")
-    date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid date"}), 400
 
     selections = StudentSelection.query.filter_by(date=date).all()
 
@@ -537,26 +601,79 @@ def demand_data():
         "dinner": {}
     }
 
-    # group by meal and student to avoid double-counting
+    # Group by meal and student to avoid double-counting
     from collections import defaultdict
     meal_to_students = defaultdict(lambda: defaultdict(set))  # meal -> item -> set(student_id)
 
     for s in selections:
-        meal_to_students[s.meal_type][s.item_name].add(s.student_id)
+        # Use template.name to get the item name
+        meal_to_students[s.meal_type][s.template.name].add(s.student_id)
 
-    # calculate percentages
+    # Calculate percentages
     for meal, item_dict in meal_to_students.items():
-        # total number of students who voted for this meal
+        # Total number of students who voted for this meal
         all_students = set()
         for students in item_dict.values():
             all_students.update(students)
         total_students = len(all_students)
+        
         if total_students == 0:
             continue
+            
         for item, students in item_dict.items():
             result[meal][item] = round((len(students) / total_students) * 100, 1)
 
     return jsonify(result)
+
+@app.route("/debug-bad-selections")
+@login_required
+def debug_bad_selections():
+    """Find all selections with missing templates"""
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    # Get all selections
+    all_selections = StudentSelection.query.all()
+    
+    bad_ones = []
+    for s in all_selections:
+        if not s.template:
+            bad_ones.append({
+                "id": s.id,
+                "student_id": s.student_id,
+                "date": str(s.date),
+                "meal_type": s.meal_type,
+                "template_id": s.template_id,
+                "problem": "Template doesn't exist"
+            })
+    
+    return jsonify({
+        "total_selections": len(all_selections),
+        "bad_selections": len(bad_ones),
+        "details": bad_ones
+    })
+
+@app.route("/clean-bad-selections")
+@login_required
+def clean_bad_selections():
+    """Delete all selections with missing templates"""
+    if current_user.role != "organisation":
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    deleted = 0
+    all_selections = StudentSelection.query.all()
+    
+    for s in all_selections:
+        if not s.template:
+            db.session.delete(s)
+            deleted += 1
+    
+    db.session.commit()
+    
+    return jsonify({
+        "message": f"Deleted {deleted} bad selection records"
+    })
+# Add menu template
 
 
 

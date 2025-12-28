@@ -94,7 +94,11 @@ function renderCalendar() {
         div.innerText = day;
 
         div.ondblclick = async () => {
-            const date = `${year}-${month + 1}-${day}`;
+            // Format date properly with zero-padding
+            const monthNum = String(month + 1).padStart(2, '0');
+            const dayNum = String(day).padStart(2, '0');
+            const date = `${year}-${monthNum}-${dayNum}`;
+            
             selectedDateText.innerText = date;
 
             const res = await fetch(`/organisation/demand-data?date=${date}`);
@@ -102,16 +106,35 @@ function renderCalendar() {
 
             results.innerHTML = "";
 
+            // Check if there's any data
+            let hasData = false;
             for (const meal in data) {
-                results.innerHTML += `<h4>${meal.toUpperCase()}</h4>`;
+                if (Object.keys(data[meal]).length > 0) {
+                    hasData = true;
+                    break;
+                }
+            }
+
+            if (!hasData) {
+                results.innerHTML = "<p style='color: #999;'>No student selections for this date yet.</p>";
+                overlay.style.display = "flex";
+                return;
+            }
+
+            for (const meal in data) {
+                if (Object.keys(data[meal]).length === 0) continue;
+                
+                results.innerHTML += `<h4 style='margin-top: 20px; margin-bottom: 10px;'>${meal.toUpperCase()}</h4>`;
 
                 for (const item in data[meal]) {
                     const percent = data[meal][item];
                     results.innerHTML += `
-                        <div>${item} (${percent}%)</div>
-                        <div class="bar">
-                            <div class="fill" style="width:${percent}%">
-                                ${percent}%
+                        <div style='margin-bottom: 15px;'>
+                            <div style='margin-bottom: 5px;'><strong>${item}</strong>: ${percent}% of students</div>
+                            <div class="bar">
+                                <div class="fill" style="width:${percent}%">
+                                    ${percent}%
+                                </div>
                             </div>
                         </div>
                     `;

@@ -9,31 +9,66 @@
     <button id="nextMonth">▶</button>
 </div>
 
+<!-- Button to manage menu items -->
+<button id="openTemplateModal" class="btn-primary">📋 Manage Menu Items Database</button>
+
 <!-- Calendar grid -->
 <div class="calendar" id="calendar"></div>
 
-<!-- Overlay modal -->
+<!-- Add Menu Template Modal -->
+<div class="overlay" id="addMenuOverlay">
+  <div class="modal">
+    <h3>Menu Items Database</h3>
+    <p class="subtitle">Add nutritional information for menu items</p>
+    
+    <!-- Scrollable list of existing items -->
+    <div class="existing-items" id="existingItems">
+      <h4>Existing Items:</h4>
+      <div id="itemsList"></div>
+    </div>
+    
+    <!-- Form to add new item -->
+    <div class="add-new-section">
+      <h4>Add New Item:</h4>
+      <div class="form-grid">
+        <input type="text" id="templateName" placeholder="Item name *" required>
+        <input type="number" step="0.1" id="calories" placeholder="Calories (kcal) *" required>
+        <input type="number" step="0.1" id="protein" placeholder="Protein (g) *" required>
+        <input type="number" step="0.1" id="carbs" placeholder="Carbs (g) *" required>
+        <input type="number" step="0.1" id="fats" placeholder="Fats (g) *" required>
+        <input type="number" step="0.1" id="sugar" placeholder="Sugar (g) *" required>
+        <input type="number" step="0.1" id="fibre" placeholder="Fibre (g) *" required>
+        <input type="number" step="0.1" id="sodium" placeholder="Sodium (mg) *" required>
+      </div>
+      <button id="saveTemplateBtn" class="btn-success">Save Item</button>
+    </div>
+    
+    <button class="btn-close" onclick="document.getElementById('addMenuOverlay').style.display='none'">Close</button>
+  </div>
+</div>
+
+<!-- Daily Menu Modal -->
 <div class="overlay" id="overlay">
     <div class="modal" id="modal">
         <h3 id="selectedDate">Selected date</h3>
+        
         <div class="meal-section">
             <h4>Breakfast</h4>
             <div class="items" id="breakfastItems"></div>
-            <button onclick="addItem('breakfast')">+ Add item</button>
+            <button onclick="addItem('breakfast')" class="btn-add">+ Add item</button>
         </div>
         
         <div class="meal-section">
             <h4>Lunch</h4>
             <div class="items" id="lunchItems"></div>
-            <button onclick="addItem('lunch')">+ Add item</button>
+            <button onclick="addItem('lunch')" class="btn-add">+ Add item</button>
         </div>
         
         <div class="meal-section">
             <h4>Dinner</h4>
             <div class="items" id="dinnerItems"></div>
-            <button onclick="addItem('dinner')">+ Add item</button>
+            <button onclick="addItem('dinner')" class="btn-add">+ Add item</button>
         </div>
-        
     </div>
 </div>
 
@@ -42,24 +77,28 @@
     display: flex;
     align-items: center;
     gap: 20px;
+    margin-bottom: 20px;
+}
+
+#openTemplateModal {
+    margin-bottom: 20px;
+    padding: 12px 24px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#openTemplateModal:hover {
+    background: #45a049;
 }
 
 .calendar {
-    margin-top: 20px;
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 10px;
-}
-
-.meal-section {
-    margin-bottom: 30px;
-}
-
-.items div {
-    padding: 6px 10px;
-    background: #f2f2f2;
-    margin-bottom: 6px;
-    border-radius: 4px;
 }
 
 .day {
@@ -67,192 +106,502 @@
     border: 1px solid #ddd;
     cursor: pointer;
     text-align: center;
+    border-radius: 4px;
 }
 
 .day:hover {
     background: #f2f2f2;
 }
 
-/* Overlay */
 .overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.5);
     display: none;
     align-items: center;
     justify-content: center;
+    z-index: 1000;
 }
 
 .modal {
     background: white;
     padding: 30px;
     border-radius: 10px;
-    width: 60%;
-    max-height: 80%;
+    width: 80%;
+    max-width: 800px;
+    max-height: 85vh;
     overflow-y: auto;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.existing-items {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+
+#itemsList {
+    display: grid;
+    gap: 8px;
+}
+
+.item-card {
+    padding: 10px;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.item-card strong {
+    color: #333;
+}
+
+.add-new-section {
+    border-top: 2px solid #eee;
+    padding-top: 20px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.form-grid input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-grid input:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.btn-success {
+    background: #4CAF50;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+}
+
+.btn-success:hover {
+    background: #45a049;
+}
+
+.btn-close {
+    background: #999;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+.meal-section {
+    margin-bottom: 30px;
+}
+
+.meal-section h4 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.items {
+    min-height: 50px;
+    margin-bottom: 10px;
+}
+
+.items > div {
+    padding: 8px 12px;
+    background: #f2f2f2;
+    margin-bottom: 6px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-add {
+    background: #2196F3;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-add:hover {
+    background: #0b7dda;
+}
+
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.autocomplete-item {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.autocomplete-item:hover {
+    background: #f5f5f5;
+}
+
+.input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.input-row input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.input-row button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-save {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-cancel {
+    background: #f44336;
+    color: white;
 }
 </style>
 
 <script>
 let currentDate = new Date();
-
 const calendar = document.getElementById("calendar");
 const monthLabel = document.getElementById("monthLabel");
 const overlay = document.getElementById("overlay");
 const selectedDateText = document.getElementById("selectedDate");
-
+const addOverlay = document.getElementById("addMenuOverlay");
 
 let selectedDate = null;
-
 let menuData = {
     breakfast: [],
     lunch: [],
     dinner: []
 };
 
+let menuTemplates = [];
 
+// Fetch menu templates
+async function fetchMenuTemplates() {
+    const res = await fetch("/organisation/get-menu-templates");
+    menuTemplates = await res.json();
+    displayExistingItems();
+}
+
+// Display existing items in the modal
+function displayExistingItems() {
+    const container = document.getElementById("itemsList");
+    container.innerHTML = "";
+    
+    if (menuTemplates.length === 0) {
+        container.innerHTML = "<p style='color: #999;'>No items yet. Add your first menu item below!</p>";
+        return;
+    }
+    
+    menuTemplates.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "item-card";
+        div.innerHTML = `
+            <strong>${item.name}</strong><br>
+            <small>${item.calories} kcal | P: ${item.protein}g | C: ${item.carbs}g | F: ${item.fats}g</small>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Open template modal
+document.getElementById("openTemplateModal").onclick = () => {
+    addOverlay.style.display = "flex";
+    fetchMenuTemplates();
+};
+
+// Close modal when clicking outside
+addOverlay.onclick = (e) => {
+    if (e.target === addOverlay) {
+        addOverlay.style.display = "none";
+    }
+};
+
+// Save new template
+document.getElementById("saveTemplateBtn").onclick = async () => {
+    const data = {
+        name: document.getElementById("templateName").value.trim(),
+        calories: parseFloat(document.getElementById("calories").value),
+        protein: parseFloat(document.getElementById("protein").value),
+        carbs: parseFloat(document.getElementById("carbs").value),
+        fats: parseFloat(document.getElementById("fats").value),
+        sugar: parseFloat(document.getElementById("sugar").value),
+        fibre: parseFloat(document.getElementById("fibre").value),
+        sodium: parseFloat(document.getElementById("sodium").value)
+    };
+    
+    // Validate
+    if (!data.name) {
+        alert("Please enter an item name");
+        return;
+    }
+    
+    for (let key in data) {
+        if (key !== 'name' && (isNaN(data[key]) || data[key] < 0)) {
+            alert(`Please enter a valid ${key} value`);
+            return;
+        }
+    }
+    
+    const res = await fetch("/organisation/add-menu-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    });
+    
+    const result = await res.json();
+    
+    if (result.success) {
+        alert("Menu item saved!");
+        // Clear form
+        document.getElementById("templateName").value = "";
+        document.getElementById("calories").value = "";
+        document.getElementById("protein").value = "";
+        document.getElementById("carbs").value = "";
+        document.getElementById("fats").value = "";
+        document.getElementById("sugar").value = "";
+        document.getElementById("fibre").value = "";
+        document.getElementById("sodium").value = "";
+        // Refresh list
+        fetchMenuTemplates();
+    } else {
+        alert(result.error || "Error saving item");
+    }
+};
+
+// Calendar rendering
 function renderCalendar() {
     calendar.innerHTML = "";
-
+    
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-
+    
     monthLabel.innerText = currentDate.toLocaleString("default", {
         month: "long",
         year: "numeric"
     });
-
-    // Empty slots before first day
+    
+    // Empty slots
     for (let i = 0; i < firstDay; i++) {
         calendar.appendChild(document.createElement("div"));
     }
-
+    
     // Days
     for (let day = 1; day <= daysInMonth; day++) {
         const cell = document.createElement("div");
         cell.className = "day";
         cell.innerText = day;
-
+        
         cell.ondblclick = async () => {
-            selectedDate = `${year}-${month + 1}-${day}`;
+            const monthNum = String(month + 1).padStart(2, '0');
+            const dayNum = String(day).padStart(2, '0');
+            selectedDate = `${year}-${monthNum}-${dayNum}`;
             selectedDateText.innerText = selectedDate;
-
-            // fetch existing menu for this date
+            
+            // Fetch existing menu
             const response = await fetch(`/organisation/get-menu/${selectedDate}`);
             const data = await response.json();
-
+            
             menuData = {
                 breakfast: data.breakfast || [],
                 lunch: data.lunch || [],
                 dinner: data.dinner || []
             };
-
-            // populate UI
+            
+            // Populate UI
             ["breakfast", "lunch", "dinner"].forEach(meal => {
                 const container = document.getElementById(meal + "Items");
                 container.innerHTML = "";
                 menuData[meal].forEach(item => {
                     const div = document.createElement("div");
-                    div.innerText = item;
+                    div.innerHTML = `
+                        <span>${item}</span>
+                        <button onclick="removeItem('${meal}', '${item}')" style="background:#f44336;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">Remove</button>
+                    `;
                     container.appendChild(div);
                 });
             });
-
+            
             overlay.style.display = "flex";
         };
-
-
-
+        
         calendar.appendChild(cell);
     }
 }
 
-function toggleSelect(meal, item) {
-  selectedMeals[meal].push(item);
+// Remove item from selection
+function removeItem(meal, itemName) {
+    menuData[meal] = menuData[meal].filter(i => i !== itemName);
+    const container = document.getElementById(meal + "Items");
+    container.innerHTML = "";
+    menuData[meal].forEach(item => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <span>${item}</span>
+            <button onclick="removeItem('${meal}', '${item}')" style="background:#f44336;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">Remove</button>
+        `;
+        container.appendChild(div);
+    });
 }
 
-function saveSelection() {
-  fetch("/student/select", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      date: selectedDate,
-      meals: selectedMeals
-    })
-  });
-}
-
-document.getElementById("prevMonth").onclick = () => {
-    currentDate.setMonth(currentDate.getMonth() - 1);
-    renderCalendar();
-};
-
-document.getElementById("nextMonth").onclick = () => {
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    renderCalendar();
-};
-
+// Add item with autocomplete
 function addItem(meal) {
     const container = document.getElementById(meal + "Items");
     
-    // Create a new input field
-    const inputDiv = document.createElement("div");
-    inputDiv.style.display = "flex";
-    inputDiv.style.gap = "10px";
-    inputDiv.style.marginBottom = "6px";
+    const inputRow = document.createElement("div");
+    inputRow.className = "input-row";
+    
+    const autocompleteContainer = document.createElement("div");
+    autocompleteContainer.className = "autocomplete-container";
     
     const input = document.createElement("input");
     input.type = "text";
-    input.placeholder = `Enter ${meal} item...`;
-    input.style.flex = "1";
-    input.style.padding = "6px 10px";
-    input.style.border = "1px solid #ddd";
-    input.style.borderRadius = "4px";
+    input.placeholder = "Type to search...";
     
-    // Save button
+    const dropdown = document.createElement("div");
+    dropdown.className = "autocomplete-dropdown";
+    dropdown.style.display = "none";
+    
+    input.oninput = () => {
+        const val = input.value.toLowerCase();
+        dropdown.innerHTML = "";
+        
+        if (val.length === 0) {
+            dropdown.style.display = "none";
+            return;
+        }
+        
+        const matches = menuTemplates.filter(i => 
+            i.name.toLowerCase().includes(val)
+        );
+        
+        if (matches.length === 0) {
+            dropdown.style.display = "none";
+            return;
+        }
+        
+        matches.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "autocomplete-item";
+            div.innerHTML = `
+                <strong>${item.name}</strong><br>
+                <small>${item.calories} kcal | P: ${item.protein}g | C: ${item.carbs}g</small>
+            `;
+            div.onclick = () => {
+                input.value = item.name;
+                dropdown.style.display = "none";
+            };
+            dropdown.appendChild(div);
+        });
+        
+        dropdown.style.display = "block";
+    };
+    
+    autocompleteContainer.appendChild(input);
+    autocompleteContainer.appendChild(dropdown);
+    
     const saveBtn = document.createElement("button");
     saveBtn.innerText = "Save";
+    saveBtn.className = "btn-save";
     saveBtn.onclick = () => {
         const value = input.value.trim();
         if (!value) return;
         
-        // Add to menuData
+        // Check if item exists in templates
+        const exists = menuTemplates.some(t => t.name === value);
+        if (!exists) {
+            alert("Item not found in database. Please add it first.");
+            return;
+        }
+        
+        // Check if already added
+        if (menuData[meal].includes(value)) {
+            alert("Item already added to this meal");
+            return;
+        }
+        
         menuData[meal].push(value);
         
-        // Replace input with saved item display
         const itemDiv = document.createElement("div");
-        itemDiv.innerText = value;
-        itemDiv.style.padding = "6px 10px";
-        itemDiv.style.background = "#f2f2f2";
-        itemDiv.style.borderRadius = "4px";
-        
-        container.replaceChild(itemDiv, inputDiv);
+        itemDiv.innerHTML = `
+            <span>${value}</span>
+            <button onclick="removeItem('${meal}', '${value}')" style="background:#f44336;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;">Remove</button>
+        `;
+        container.replaceChild(itemDiv, inputRow);
     };
     
-    // Cancel button
     const cancelBtn = document.createElement("button");
     cancelBtn.innerText = "Cancel";
+    cancelBtn.className = "btn-cancel";
     cancelBtn.onclick = () => {
-        container.removeChild(inputDiv);
+        container.removeChild(inputRow);
     };
     
-    inputDiv.appendChild(input);
-    inputDiv.appendChild(saveBtn);
-    inputDiv.appendChild(cancelBtn);
+    inputRow.appendChild(autocompleteContainer);
+    inputRow.appendChild(saveBtn);
+    inputRow.appendChild(cancelBtn);
     
-    container.appendChild(inputDiv);
-    
-    // Auto-focus the input
+    container.appendChild(inputRow);
     input.focus();
 }
 
-// Close modal when clicking outside
+// Close daily menu modal and save
 overlay.onclick = async (e) => {
     if (e.target === overlay) {
         await fetch("/organisation/save-menu", {
@@ -263,13 +612,24 @@ overlay.onclick = async (e) => {
                 meals: menuData
             })
         });
-
+        
         overlay.style.display = "none";
     }
 };
 
+// Navigation
+document.getElementById("prevMonth").onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+};
 
+document.getElementById("nextMonth").onclick = () => {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+};
 
+// Initialize
+fetchMenuTemplates();
 renderCalendar();
 </script>
 
