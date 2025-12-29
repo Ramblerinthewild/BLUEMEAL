@@ -60,3 +60,47 @@ class StudentSelection(db.Model):
 
     student = db.relationship("User")
     template = db.relationship("MenuItemTemplate")
+
+class WellbeingFeedback(db.Model):
+    __tablename__ = "wellbeing_feedback"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    week_start = db.Column(db.Date, nullable=False)  # Monday of the week
+    
+    # Energy & Alertness (1-5 scale)
+    morning_alertness = db.Column(db.Integer)  # How alert in morning classes
+    afternoon_energy = db.Column(db.Integer)   # Energy after lunch
+    overall_energy = db.Column(db.Integer)     # General energy through day
+    
+    # Focus & Performance
+    concentration = db.Column(db.Integer)      # Ability to focus
+    mental_clarity = db.Column(db.Integer)     # Clear thinking
+    
+    # Physical Wellbeing
+    digestion = db.Column(db.Integer)          # Digestive comfort
+    sleep_quality = db.Column(db.Integer)      # How well they slept
+    
+    # Open feedback
+    comments = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    student = db.relationship("User")
+
+class WasteRecord(db.Model):
+    __tablename__ = "waste_record"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+
+    date = db.Column(db.Date, nullable=False)
+    time = db.Column(db.Time, nullable=False)
+
+    record_type = db.Column(db.String(20), nullable=False)
+    # "meal", "day", "week"
+
+    kg = db.Column(db.Float, nullable=False)
+
+    user = db.relationship("User")

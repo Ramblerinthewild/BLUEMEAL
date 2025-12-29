@@ -1,4 +1,186 @@
 {% extends "organisation/base_org.html" %}
 {% block content %}
-<h2>Waste</h2>
+
+<h2>Food Waste Analytics</h2>
+
+<!-- Add Waste Button -->
+<button id="openWasteModal" class="btn">Add Waste Data</button>
+
+<hr>
+
+<!-- Charts -->
+<div class="charts-container">
+    <div class="chart-box">
+        <h3>Daily Waste (kg)</h3>
+        <canvas id="dailyWasteChart"></canvas>
+    </div>
+
+    <div class="chart-box">
+        <h3>Weekly Waste (kg)</h3>
+        <canvas id="weeklyWasteChart"></canvas>
+    </div>
+
+    <div class="chart-box">
+        <h3>Waste by Meal</h3>
+        <canvas id="mealWasteChart"></canvas>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="wasteModal" class="modal hidden">
+    <div class="modal-content">
+        <h3>Add Waste Record</h3>
+
+        <label>Waste (kg)</label>
+        <input type="number" id="wasteKg" step="0.01" min="0">
+
+        <label>Type</label>
+        <select id="wasteType">
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="meal">Meal</option>
+        </select>
+
+        <label>Date</label>
+        <input type="date" id="wasteDate">
+
+        <label>Meal (only if meal selected)</label>
+        <select id="mealType">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+        </select>
+
+        <div class="modal-actions">
+            <button id="saveWaste">Save</button>
+            <button id="closeWasteModal">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Page JS -->
+<script>
+const modal = document.getElementById("wasteModal");
+
+document.getElementById("openWasteModal").onclick = () => {
+    modal.classList.remove("hidden");
+};
+
+document.getElementById("closeWasteModal").onclick = () => {
+    modal.classList.add("hidden");
+};
+
+document.getElementById("saveWaste").onclick = async () => {
+    const kg = parseFloat(document.getElementById("wasteKg").value);
+    const type = document.getElementById("wasteType").value;
+    const date = document.getElementById("wasteDate").value;
+    const mealType = document.getElementById("mealType").value;
+
+    if (isNaN(kg) || kg <= 0) {
+        alert("Enter a valid waste amount");
+        return;
+    }
+
+    // Send POST request to your Flask API
+    const response = await fetch("/api/waste", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            waste_kg: kg,
+            record_type: type,
+            meal_type: type === "meal" ? mealType : null,
+            date: date
+        })
+    });
+
+    const result = await response.json();
+    if (result.status === "ok") {
+        modal.classList.add("hidden"); // hide modal
+        loadCharts(); // refresh the charts
+    } else {
+        alert("Error saving waste data");
+    }
+};
+
+let dailyChart, weeklyChart, mealChart;
+
+async function loadCharts() {
+    const res = await fetch("/organisation/waste/data");
+    const data = await res.json();
+
+    const labels = data.labels;
+    const values = data.values;
+
+    // Daily chart
+    const ctx1 = document.getElementById("dailyWasteChart").getContext("2d");
+    if (dailyChart) dailyChart.destroy();
+    dailyChart = new Chart(ctx1, {
+        type: "line",
+        data: { labels, datasets: [{ label: "Waste (kg)", data: values, borderColor: "#4caf50", tension: 0.3 }] }
+    });
+
+    // Weekly and Meal charts can be created similarly, 
+    // or you can process 'data' on backend to send separate datasets
+}
+
+loadCharts(); // initial load
+
+
+</script>
+
+<style>
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+}
+
+.chart-box {
+    background: #111;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #1b1b1b;
+    padding: 20px;
+    width: 320px;
+    border-radius: 12px;
+}
+
+.modal-content input,
+.modal-content select {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 6px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: space-between;
+}
+
+.btn {
+    padding: 8px 14px;
+}
+</style>
+
 {% endblock %}

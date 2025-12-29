@@ -1,0 +1,212 @@
+{% extends "member/base_member.html" %}
+
+{% block title %}Weekly Feedback{% endblock %}
+
+{% block content %}
+
+<style>
+    .feedback-section {
+        margin-bottom: 2.5rem;
+    }
+    
+    .rating-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .rating-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: #333;
+    }
+    
+    .rating-scale {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .rating-option {
+        position: relative;
+    }
+    
+    .rating-option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+    
+    .rating-option label {
+        display: block;
+        padding: 1rem 1.5rem;
+        background: #f0f0f0;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: center;
+        min-width: 80px;
+    }
+    
+    .rating-option input[type="radio"]:checked + label {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: scale(1.05);
+    }
+    
+    .rating-option label:hover {
+        background: #e0e0e0;
+    }
+    
+    .rating-option input[type="radio"]:checked + label:hover {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    textarea {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-family: inherit;
+        font-size: 1rem;
+        resize: vertical;
+        min-height: 120px;
+    }
+    
+    textarea:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+</style>
+
+<div class="card">
+    <h1 style="margin-bottom: 0.5rem;">Weekly Wellbeing Feedback</h1>
+    <p style="color: #666; margin-bottom: 2rem;">Week of {{ week_start.strftime('%B %d, %Y') }}</p>
+    
+    {% if already_submitted %}
+        <div style="background: #d4edda; padding: 2rem; border-radius: 15px; text-align: center; border-left: 4px solid #28a745;">
+            <h3 style="color: #155724; margin-bottom: 0.5rem;">✅ Feedback Already Submitted</h3>
+            <p style="color: #155724; margin-bottom: 1rem;">You've already submitted your feedback for this week. Thank you!</p>
+            <a href="{{ url_for('member_analytics') }}" class="btn btn-primary">Back to Analytics</a>
+        </div>
+    {% else %}
+        <form method="POST" action="{{ url_for('member_feedback') }}">
+            <!-- Energy & Alertness Section -->
+            <div class="feedback-section">
+                <h2 style="margin-bottom: 1.5rem; color: #667eea;">⚡ Energy & Alertness</h2>
+                
+                <div class="rating-group">
+                    <label class="rating-label">How alert do you feel during morning classes?</label>
+                    <div class="rating-scale">
+                        {% for i in range(1, 6) %}
+                            <div class="rating-option">
+                                <input type="radio" name="morning_alertness" id="morning_{{ i }}" value="{{ i }}" required>
+                                <label for="morning_{{ i }}">
+                                    {{ i }}<br>
+                                    <small>{{ ['Very Tired', 'Tired', 'Okay', 'Alert', 'Very Alert'][i-1] }}</small>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="rating-group">
+                    <label class="rating-label">How is your energy after lunch?</label>
+                    <div class="rating-scale">
+                        {% for i in range(1, 6) %}
+                            <div class="rating-option">
+                                <input type="radio" name="afternoon_energy" id="afternoon_{{ i }}" value="{{ i }}" required>
+                                <label for="afternoon_{{ i }}">
+                                    {{ i }}<br>
+                                    <small>{{ ['Very Low', 'Low', 'Moderate', 'Good', 'Excellent'][i-1] }}</small>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="rating-group">
+                    <label class="rating-label">Overall energy throughout the day?</label>
+                    <div class="rating-scale">
+                        {% for i in range(1, 6) %}
+                            <div class="rating-option">
+                                <input type="radio" name="overall_energy" id="overall_{{ i }}" value="{{ i }}" required>
+                                <label for="overall_{{ i }}">
+                                    {{ i }}<br>
+                                    <small>{{ ['Very Low', 'Low', 'Moderate', 'Good', 'Excellent'][i-1] }}</small>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Focus & Performance Section -->
+            <div class="feedback-section">
+                <h2 style="margin-bottom: 1.5rem; color: #667eea;">🎯 Focus & Performance</h2>
+                
+                <div class="rating-group">
+                    <label class="rating-label">How well can you concentrate in class?</label>
+                    <div class="rating-scale">
+                        {% for i in range(1, 6) %}
+                            <div class="rating-option">
+                                <input type="radio" name="concentration" id="concentration_{{ i }}" value="{{ i }}" required>
+                                <label for="concentration_{{ i }}">
+                                    {{ i }}<br>
+                                    <small>{{ ['Very Poor', 'Poor', 'Okay', 'Good', 'Excellent'][i-1] }}</small>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="rating-group">
+                    <label class="rating-label">Mental clarity and clear thinking?</label>
+                    <div class="rating-scale">
+                        {% for i in range(1, 6) %}
+                            <div class="rating-option">
+                                <input type="radio" name="mental_clarity" id="clarity_{{ i }}" value="{{ i }}" required>
+                                <label for="clarity_{{ i }}">
+                                    {{ i }}<br>
+                                    <small>{{ ['Very Foggy', 'Foggy', 'Okay', 'Clear', 'Very Clear'][i-1] }}</small>
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Physical Wellbeing Section -->
+            <div class="feedback-section">
+                <h2 style="margin-bottom: 1.5rem; color: #667eea;">💪 Physical Wellbeing</h2>
+                
+                <div class="rating-group">
+                    <label class="rating-label">How comfortable is your digestion?</label>
+                    <div class="rating-group">
+                        <label class="rating-label">How well are you sleeping?</label>
+                        <div class="rating-scale">
+                            {% for i in range(1, 6) %}
+                                <div class="rating-option">
+                                    <input type="radio" name="sleep_quality" id="sleep_{{ i }}" value="{{ i }}" required>
+                                    <label for="sleep_{{ i }}">
+                                        {{ i }}<br>
+                                        <small>{{ ['Very Poor', 'Poor', 'Okay', 'Good', 'Excellent'][i-1] }}</small>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comments Section -->
+                <div class="feedback-section">
+                    <h2 style="margin-bottom: 1.5rem; color: #667eea;">💭 Additional Comments</h2>
+                    <label class="rating-label">Any other feedback about the meals or how you're feeling?</label>
+                    <textarea name="comments" placeholder="Optional: Share any additional thoughts..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;">
+                    Submit Feedback
+                </button>
+            </form>
+        {% endif %}
+</div>
+{% endblock %}

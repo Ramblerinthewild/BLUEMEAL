@@ -5,7 +5,7 @@ import csv
 import json
 from pathlib import Path
 from flask import request, jsonify
-from models import db, User, MenuItemTemplate, MenuItem, StudentSelection
+from models import db, User, MenuItemTemplate, MenuItem, StudentSelection, WellbeingFeedback, WasteRecord
 
 import pandas as pd
 from flask import (Flask, flash, jsonify, redirect, render_template, request,
@@ -48,6 +48,8 @@ with app.app_context():
 # -----------------------
 # Auth
 # -----------------------
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -61,6 +63,247 @@ def is_school_email(email):
 # -----------------------
 # Utilities: CSV + Nutrition
 # -----------------------
+
+# Add this near the top of app.py after imports
+
+# Daily recommended nutrient values (for adults/teens - simplified)
+DAILY_RECOMMENDED = {
+    "calories": {"min": 1800, "max": 2400, "unit": "kcal"},
+    "protein": {"min": 50, "max": 150, "unit": "g"},
+    "carbs": {"min": 225, "max": 325, "unit": "g"},
+    "fats": {"min": 44, "max": 78, "unit": "g"},
+    "sugar": {"min": 0, "max": 50, "unit": "g"},  # Should be limited
+    "fibre": {"min": 25, "max": 38, "unit": "g"},
+    "sodium": {"min": 0, "max": 2300, "unit": "mg"}  # Should be limited
+}
+
+# Why each nutrient matters (student-focused explanations)
+# Why each nutrient matters (student-focused explanations)
+NUTRIENT_BENEFITS = {
+    "calories": {
+        "benefit": "Provides energy for daily activities and learning",
+        "impact": "May cause fatigue and difficulty staying active",
+        "daily_impact": "You might feel tired and struggle with physical activities"
+    },
+    "protein": {
+        "benefit": "Helps build muscle and keeps you full longer",
+        "impact": "May cause hunger between meals and reduced focus",
+        "daily_impact": "You might feel tired during afternoon classes"
+    },
+    "carbs": {
+        "benefit": "Your brain's main fuel source for focus and energy",
+        "impact": "May cause energy crashes and difficulty concentrating",
+        "daily_impact": "You could feel sluggish during study sessions"
+    },
+    "fats": {
+        "benefit": "Supports brain function and helps absorb vitamins",
+        "impact": "May lead to difficulty concentrating",
+        "daily_impact": "Your focus might decline during long classes"
+    },
+    "fibre": {
+        "benefit": "Aids digestion and keeps you feeling full",
+        "impact": "May cause digestive discomfort and irregular energy",
+        "daily_impact": "You might feel bloated or uncomfortable after meals"
+    },
+    "sugar": {
+        "benefit": "Should be limited - causes energy spikes and crashes",
+        "impact": "May cause afternoon energy crashes",
+        "daily_impact": "You could feel very tired around 2-3 PM"
+    },
+    "sodium": {
+        "benefit": "Should be limited - excess can cause water retention",
+        "impact": "May cause bloating and headaches",
+        "daily_impact": "You might feel puffy and less energetic"
+    }
+}
+
+def analyze_daily_nutrition(student_id, date):
+    """
+    Analyze a student's nutrition for a given day
+    Returns totals, percentages, suggestions, and per-meal breakdown
+    """
+    selections = StudentSelection.query.filter_by(
+        student_id=student_id,
+        date=date
+    ).all()
+    
+    if not selections:
+        return None
+    
+    # Calculate totals
+    totals = {
+        "calories": 0,
+        "protein": 0,
+        "carbs": 0,
+        "fats": 0,
+        "sugar": 0,
+        "fibre": 0,
+        "sodium": 0
+    }
+    
+    meals = {"breakfast": [], "lunch": [], "dinner": []}
+    meal_totals = {
+        "breakfast": {"calories": 0, "protein": 0, "carbs": 0, "fats": 0, "sugar": 0, "fibre": 0, "sodium": 0},
+        "lunch": {"calories": 0, "protein": 0, "carbs": 0, "fats": 0, "sugar": 0, "fibre": 0, "sodium": 0},
+        "dinner": {"calories": 0, "protein": 0, "carbs": 0, "fats": 0, "sugar": 0, "fibre": 0, "sodium": 0}
+    }
+    
+    for s in selections:
+        if not s.template:
+            continue
+        
+        meals[s.meal_type].append(s.template.name)
+        
+        # Add to daily totals
+        totals["calories"] += s.template.calories
+        totals["protein"] += s.template.protein
+        totals["carbs"] += s.template.carbs
+        totals["fats"] += s.template.fats
+        totals["sugar"] += s.template.sugar
+        totals["fibre"] += s.template.fibre
+        totals["sodium"] += s.template.sodium
+        
+        # Add to meal totals
+        meal_totals[s.meal_type]["calories"] += s.template.calories
+        meal_totals[s.meal_type]["protein"] += s.template.protein
+        meal_totals[s.meal_type]["carbs"] += s.template.carbs
+        meal_totals[s.meal_type]["fats"] += s.template.fats
+        meal_totals[s.meal_type]["sugar"] += s.template.sugar
+        meal_totals[s.meal_type]["fibre"] += s.template.fibre
+        meal_totals[s.meal_type]["sodium"] += s.template.sodium
+    
+    # Calculate percentages
+    percentages = {}
+    for nutrient, value in totals.items():
+        rec = DAILY_RECOMMENDED[nutrient]
+        target = (rec["min"] + rec["max"]) / 2
+        
+        if nutrient in ["sugar", "sodium"]:
+            percentages[nutrient] = min(100, (value / rec["max"]) * 100)
+        else:
+            percentages[nutrient] = min(100, (value / target) * 100)
+    
+    # Generate overall suggestions
+    suggestions = generate_suggestions(totals, meals)
+    
+    # Generate per-meal breakdown with suggestions
+    meal_breakdown = {}
+    for meal_name, meal_items in meals.items():
+        if not meal_items:
+            continue
+            
+        meal_suggestions = []
+        
+        # Check if meal is protein-deficient
+        if meal_totals[meal_name]["protein"] < 15:
+            meal_suggestions.append(f"This meal is low in protein ({meal_totals[meal_name]['protein']:.1f}g). Consider adding eggs, chicken, or fish.")
+        
+        # Check if meal is fiber-deficient
+        if meal_totals[meal_name]["fibre"] < 5:
+            meal_suggestions.append(f"This meal could use more fiber ({meal_totals[meal_name]['fibre']:.1f}g). Try adding vegetables or whole grains.")
+        
+        # Check if meal is too high in sugar
+        if meal_totals[meal_name]["sugar"] > 15:
+            meal_suggestions.append(f"This meal is high in sugar ({meal_totals[meal_name]['sugar']:.1f}g). This might cause an energy crash later.")
+        
+        meal_breakdown[meal_name] = {
+            "items": meal_items,
+            "totals": meal_totals[meal_name],
+            "suggestions": meal_suggestions
+        }
+    
+    return {
+        "totals": totals,
+        "percentages": percentages,
+        "meals": meals,
+        "suggestions": suggestions,
+        "meal_breakdown": meal_breakdown
+    }
+
+def generate_suggestions(totals, current_meals):
+    """
+    Generate nutrition suggestions based on what's missing
+    """
+    suggestions = []
+    
+    for nutrient, value in totals.items():
+        rec = DAILY_RECOMMENDED[nutrient]
+        
+        # Skip sugar and sodium (we want these LOW)
+        if nutrient in ["sugar", "sodium"]:
+            if value > rec["max"]:
+                suggestions.append({
+                    "type": "warning",
+                    "nutrient": nutrient,
+                    "message": f"Your {nutrient} intake is high ({value}{rec['unit']}). Try to limit processed foods.",
+                    "reason": NUTRIENT_BENEFITS[nutrient]["impact"],
+                    "daily_impact": NUTRIENT_BENEFITS[nutrient]["daily_impact"],
+                    "items": []
+                })
+            continue
+        
+        # Check if below minimum
+        if value < rec["min"]:
+            deficit = rec["min"] - value
+            
+            # Find menu items high in this nutrient
+            recommended_items = find_items_high_in_nutrient(nutrient, current_meals)
+            
+            suggestions.append({
+                "type": "suggestion",
+                "nutrient": nutrient.capitalize(),
+                "current": round(value, 1),
+                "target": rec["min"],
+                "deficit": round(deficit, 1),
+                "unit": rec["unit"],
+                "message": f"Your diet contains too little {nutrient} ({value}{rec['unit']} / {rec['min']}{rec['unit']} recommended).",
+                "benefit": NUTRIENT_BENEFITS[nutrient]["benefit"],
+                "daily_impact": NUTRIENT_BENEFITS[nutrient]["daily_impact"],
+                "recommended_items": recommended_items[:3]  # Top 3 suggestions
+            })
+    
+    return suggestions
+
+def find_items_high_in_nutrient(nutrient, exclude_meals):
+    """
+    Find menu items high in a specific nutrient
+    Exclude items already selected
+    """
+    # Get all currently selected item names
+    exclude_names = []
+    for meal_items in exclude_meals.values():
+        exclude_names.extend(meal_items)
+    
+    # Query templates not already selected
+    all_items = MenuItemTemplate.query.filter(
+        ~MenuItemTemplate.name.in_(exclude_names)
+    ).all()
+    
+    # Sort by nutrient content
+    nutrient_map = {
+        "calories": lambda x: x.calories,
+        "protein": lambda x: x.protein,
+        "carbs": lambda x: x.carbs,
+        "fats": lambda x: x.fats,
+        "fibre": lambda x: x.fibre
+    }
+    
+    if nutrient not in nutrient_map:
+        return []
+    
+    sorted_items = sorted(all_items, key=nutrient_map[nutrient], reverse=True)
+    
+    # Return top items with their nutrient content
+    results = []
+    for item in sorted_items[:5]:
+        results.append({
+            "name": item.name,
+            "amount": round(getattr(item, nutrient), 1),
+            "unit": DAILY_RECOMMENDED[nutrient]["unit"]
+        })
+    
+    return results
+
 def load_menu_df():
     # Use pandas for flexible parsing
     return pd.read_csv(MENU_CSV, parse_dates=["date"])
@@ -429,7 +672,7 @@ def analytics_data():
 def member_dashboard():
     if current_user.role != "member":
         return redirect(url_for("index"))
-    return render_template("member.html")
+    return render_template("member/member.html")
 
 
 @app.route("/individual")
@@ -521,10 +764,6 @@ def export_selections():
 def calender_day():
     return render_template("calender_day.html")
 
-@app.route("/Analytics")
-@login_required  # optional: require login
-def Analytics():
-    return render_template("analytics.html")
 
 latest_submission = ""  # TEMP storage (fine for now)
 
@@ -673,8 +912,136 @@ def clean_bad_selections():
     return jsonify({
         "message": f"Deleted {deleted} bad selection records"
     })
-# Add menu template
 
+@app.route("/member/analytics")
+@login_required
+def member_analytics():
+    if current_user.role != "member":
+        return redirect(url_for("index"))
+    
+    # Get today's date or allow date selection
+    date_str = request.args.get("date")
+    if date_str:
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            date = datetime.now().date()
+    else:
+        date = datetime.now().date()
+    
+    analysis = analyze_daily_nutrition(current_user.id, date)
+    
+    return render_template("member/member_analytics.html", 
+                         analysis=analysis, 
+                         date=date,
+                         daily_rec=DAILY_RECOMMENDED,
+                         today=datetime.now().date())
+
+
+@app.route("/member/feedback", methods=["GET", "POST"])
+@login_required
+def member_feedback():
+    if current_user.role != "member":
+        return redirect(url_for("index"))
+    
+    from datetime import timedelta
+    
+    # Get the start of current week (Monday)
+    today = datetime.now().date()
+    week_start = today - timedelta(days=today.weekday())
+    
+    if request.method == "POST":
+        # Check if feedback already exists for this week
+        existing = WellbeingFeedback.query.filter_by(
+            student_id=current_user.id,
+            week_start=week_start
+        ).first()
+        
+        if existing:
+            flash("You've already submitted feedback for this week!", "warning")
+            return redirect(url_for("member_analytics"))
+        
+        feedback = WellbeingFeedback(
+            student_id=current_user.id,
+            week_start=week_start,
+            morning_alertness=int(request.form.get("morning_alertness")),
+            afternoon_energy=int(request.form.get("afternoon_energy")),
+            overall_energy=int(request.form.get("overall_energy")),
+            concentration=int(request.form.get("concentration")),
+            mental_clarity=int(request.form.get("mental_clarity")),
+            digestion=int(request.form.get("digestion")),
+            sleep_quality=int(request.form.get("sleep_quality")),
+            comments=request.form.get("comments", "")
+        )
+        
+        db.session.add(feedback)
+        db.session.commit()
+        
+        flash("Thank you for your feedback!", "success")
+        return redirect(url_for("member_analytics"))
+    
+    # Check if already submitted this week
+    existing = WellbeingFeedback.query.filter_by(
+        student_id=current_user.id,
+        week_start=week_start
+    ).first()
+    
+    return render_template("member/feedback.html", 
+                         week_start=week_start,
+                         already_submitted=existing is not None)
+# Add menu template
+@app.route("/api/waste", methods=["POST"])
+@login_required
+def add_waste():
+    data = request.json
+    record_date = datetime.strptime(data.get("date"), "%Y-%m-%d").date() if data.get("date") else datetime.now().date()
+
+    record = WasteRecord(
+        organisation_id=current_user.organisation_id,
+        waste_kg=float(data["waste_kg"]),
+        record_type=data["record_type"],
+        meal_type=data.get("meal_type"),
+        date=record_date,
+        time=datetime.now().time()
+    )
+
+    db.session.add(record)
+    db.session.commit()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/organisation/waste/add", methods=["POST"])
+@login_required
+def add_waste_api():
+    kg = float(request.form["kg"])
+    record_type = request.form["type"]
+
+    now = datetime.now()
+
+    waste = WasteRecord(
+        user_id=current_user.id,
+        date=now.date(),
+        time=now.time(),
+        record_type=record_type,
+        kg=kg
+    )
+
+    db.session.add(waste)
+    db.session.commit()
+
+    return {"status": "ok"}
+
+@app.route("/organisation/waste/data")
+@login_required
+def waste_data():
+    records = WasteRecord.query.filter_by(
+        user_id=current_user.id
+    ).order_by(WasteRecord.date, WasteRecord.time).all()
+
+    return {
+        "labels": [f"{r.date} {r.time.strftime('%H:%M')}" for r in records],
+        "values": [r.kg for r in records]
+    }
 
 
 # -----------------------

@@ -1,0 +1,344 @@
+{% extends "member/base_member.html" %}
+
+{% block title %}Nutrition Analytics{% endblock %}
+
+{% block content %}
+
+<style>
+    .date-selector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        background: white;
+        padding: 1rem;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .date-btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+    
+    .date-btn:hover {
+        background: #5568d3;
+    }
+    
+    .current-date {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #333;
+        min-width: 200px;
+        text-align: center;
+    }
+    
+    .nutrient-bar {
+        background: #e0e0e0;
+        height: 30px;
+        border-radius: 15px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .nutrient-fill {
+        height: 100%;
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 10px;
+        color: #333;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .nutrient-fill.good {
+        background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
+    }
+    
+    .nutrient-fill.low {
+        background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%);
+    }
+    
+    .nutrient-fill.warning {
+        background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .suggestion-card {
+        padding: 1.5rem;
+        border-radius: 15px;
+        border-left: 4px solid;
+    }
+    
+    .suggestion-card.suggestion {
+        background: #e7f3ff;
+        border-color: #667eea;
+    }
+    
+    .suggestion-card.warning {
+        background: #fff3cd;
+        border-color: #ffc107;
+    }
+    
+    .meal-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+    
+    .meal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 1.5rem !important;
+        }
+        
+        h2 {
+            font-size: 1.25rem !important;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+
+<!-- Date Selector -->
+<div class="date-selector">
+    <button class="date-btn" onclick="changeDate(-1)">◀</button>
+    <div class="current-date" id="currentDate">{{ date.strftime('%B %d, %Y') }}</div>
+    <button class="date-btn" onclick="changeDate(1)">▶</button>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1 style="margin: 0; font-size: 2rem;">Your Nutrition</h1>
+        <a href="{{ url_for('member_feedback') }}" class="btn btn-primary">Weekly Feedback</a>
+    </div>
+    
+    {% if not analysis %}
+        <div style="text-align: center; padding: 3rem; color: #999;">
+            <p style="font-size: 1.2rem; margin-bottom: 1rem;">📊 No meals selected yet</p>
+            <p>Select your meals to see your nutrition breakdown</p>
+            <a href="{{ url_for('member_dashboard') }}" class="btn btn-primary" style="margin-top: 1rem;">Select Meals</a>
+        </div>
+    {% else %}
+        <!-- Summary Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-value">{{ "%.0f"|format(analysis.totals.calories) }}</span>
+                <span class="stat-label">Calories</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ "%.0f"|format(analysis.totals.protein) }}g</span>
+                <span class="stat-label">Protein</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ "%.0f"|format(analysis.totals.carbs) }}g</span>
+                <span class="stat-label">Carbs</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ "%.0f"|format(analysis.totals.fibre) }}g</span>
+                <span class="stat-label">Fiber</span>
+            </div>
+        </div>
+        
+        <!-- Daily Nutrition Progress -->
+        <h2 style="margin-bottom: 1.5rem;">Daily Nutrition Overview</h2>
+        
+        <div style="display: grid; gap: 1.5rem; margin-bottom: 3rem;">
+            {% for nutrient, percentage in analysis.percentages.items() %}
+                {% set total = analysis.totals[nutrient] %}
+                {% set rec = daily_rec[nutrient] %}
+                {% set is_warning = nutrient in ['sugar', 'sodium'] and percentage > 80 %}
+                {% set is_low = nutrient not in ['sugar', 'sodium'] and percentage < 70 %}
+                {% set bar_class = 'warning' if is_warning else ('low' if is_low else 'good') %}
+                
+                <div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 600; text-transform: capitalize;">{{ nutrient }}</span>
+                        <span style="color: #666;">{{ "%.1f"|format(total) }} / {{ (rec.min + rec.max) / 2 }} {{ rec.unit }}</span>
+                    </div>
+                    
+                    <div class="nutrient-bar">
+                        <div class="nutrient-fill {{ bar_class }}" style="width: {{ "%.1f"|format(percentage) }}%;">
+                            {{ "%.0f"|format(percentage) }}%
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Per-Meal Breakdown -->
+        <h2 style="margin-bottom: 1.5rem;">Meal Breakdown & Suggestions</h2>
+        
+        {% for meal_name, meal_suggestions in analysis.meal_breakdown.items() %}
+            <div class="meal-card">
+                <div class="meal-header">
+                    <h3 style="margin: 0; text-transform: capitalize; color: #667eea;">{{ meal_name }}</h3>
+                    <span style="color: #999;">{{ meal_suggestions.items()|length }} item(s)</span>
+                </div>
+                
+                <!-- Items in this meal -->
+                <div style="margin-bottom: 1rem;">
+                    {% for item in meal_suggestions.items() %}
+                        <span style="display: inline-block; background: #f0f0f0; padding: 0.5rem 1rem; border-radius: 20px; margin: 0.25rem;">
+                            {{ item }}
+                        </span>
+                    {% endfor %}
+                </div>
+                
+                <!-- Meal nutrition totals -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 10px; margin-bottom: 1rem;">
+                    <div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #667eea;">{{ "%.0f"|format(meal_suggestions.totals.calories) }}</div>
+                        <div style="font-size: 0.85rem; color: #666;">Calories</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #667eea;">{{ "%.1f"|format(meal_suggestions.totals.protein) }}g</div>
+                        <div style="font-size: 0.85rem; color: #666;">Protein</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #667eea;">{{ "%.1f"|format(meal_suggestions.totals.carbs) }}g</div>
+                        <div style="font-size: 0.85rem; color: #666;">Carbs</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.2rem; font-weight: 600; color: #667eea;">{{ "%.1f"|format(meal_suggestions.totals.fibre) }}g</div>
+                        <div style="font-size: 0.85rem; color: #666;">Fiber</div>
+                    </div>
+                </div>
+                
+                <!-- Suggestions for this meal -->
+                {% if meal_suggestions.suggestions %}
+                    <div>
+                        <strong style="display: block; margin-bottom: 0.75rem;">💡 Suggestions for this meal:</strong>
+                        {% for suggestion in meal_suggestions.suggestions %}
+                            <div style="background: #e7f3ff; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 3px solid #667eea;">
+                                <p style="margin: 0; color: #555;">{{ suggestion }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+        
+        <!-- Overall Suggestions -->
+        {% if analysis.suggestions %}
+            <div style="border-top: 2px solid #f0f0f0; padding-top: 2rem; margin-top: 2rem;">
+                <h2 style="margin-bottom: 1.5rem;">💡 Overall Recommendations</h2>
+                
+                <div style="display: grid; gap: 1.5rem;">
+                    {% for suggestion in analysis.suggestions %}
+                        <div class="suggestion-card {{ suggestion.type }}">
+                            <h3 style="margin-bottom: 0.75rem; color: #333;">
+                                {% if suggestion.type == 'warning' %}⚠️{% else %}✨{% endif %}
+                                {{ suggestion.nutrient }}
+                                {% if suggestion.type != 'warning' %}
+                                    - {{ suggestion.deficit }} {{ suggestion.unit }} below target
+                                {% endif %}
+                            </h3>
+                            
+                            <p style="color: #555; margin-bottom: 0.75rem; line-height: 1.6;">
+                                {{ suggestion.message }}
+                            </p>
+                            
+                            {% if suggestion.benefit %}
+                                <p style="color: #667eea; margin-bottom: 0.5rem; font-weight: 600;">
+                                    Why it matters: {{ suggestion.benefit }}
+                                </p>
+                            {% endif %}
+                            
+                            {% if suggestion.daily_impact %}
+                                <p style="color: #764ba2; margin-bottom: 1rem; font-style: italic;">
+                                    Impact on your day: {{ suggestion.daily_impact }}
+                                </p>
+                            {% endif %}
+                            
+                            {% if suggestion.recommended_items %}
+                                <div style="background: white; padding: 1rem; border-radius: 10px; margin-top: 1rem;">
+                                    <strong style="display: block; margin-bottom: 0.5rem;">Try adding:</strong>
+                                    <ul style="list-style: none; display: grid; gap: 0.5rem;">
+                                        {% for item in suggestion.recommended_items %}
+                                            <li style="display: flex; justify-content: space-between; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
+                                                <span>{{ item.name }}</span>
+                                                <span style="color: #667eea; font-weight: 600;">
+                                                    +{{ item.amount }} {{ item.unit }}
+                                                </span>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% else %}
+            <div style="background: #d4edda; padding: 1.5rem; border-radius: 15px; text-align: center; border-left: 4px solid #28a745;">
+                <h3 style="color: #155724; margin-bottom: 0.5rem;">🎉 Great job!</h3>
+                <p style="color: #155724;">Your nutrition looks balanced for today. Keep it up!</p>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<script>
+let currentDate = new Date('{{ date.strftime("%Y-%m-%d") }}');
+
+function changeDate(days) {
+    currentDate.setDate(currentDate.getDate() + days);
+    const dateStr = currentDate.toISOString().split('T')[0];
+    window.location.href = `/member/analytics?date=${dateStr}`;
+}
+
+document.getElementById('currentDate').innerText = currentDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+});
+</script>
+
+{% endblock %}
